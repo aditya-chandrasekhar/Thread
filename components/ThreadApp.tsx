@@ -59,6 +59,7 @@ export default function ThreadApp() {
 
   useEffect(() => {
     api.status().then(setStatus).catch(() => setStatus(null));
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- state is set after awaits, not synchronously
     refreshPeople();
     api.threads().then(setThreads).catch(() => {});
   }, [refreshPeople]);
@@ -118,7 +119,15 @@ export default function ThreadApp() {
       setPhase("transcribing");
       try {
         const text = await api.transcribe(audio);
-        setSheet({ initialText: text, notice: null });
+        if (text.trim().length >= 10) {
+          // Ambient by default: straight into memory, no confirmation step.
+          await submitTranscript(text);
+          return;
+        }
+        setSheet({
+          initialText: text,
+          notice: "The recording came back nearly empty — add or paste the conversation.",
+        });
       } catch (err) {
         setSheet({
           initialText: "",
@@ -159,11 +168,14 @@ export default function ThreadApp() {
       }
     } catch (err) {
       setPhase("idle");
-      setSheet((s) =>
-        s
-          ? { ...s, initialText: transcript, notice: `Couldn't save memory: ${err instanceof Error ? err.message : "unknown error"}. Try again.` }
-          : s
-      );
+      // Never lose the words: surface the transcript for retry, even when
+      // it skipped the review sheet on the way in.
+      setSheet({
+        initialText: transcript,
+        notice: `Couldn't save memory: ${
+          err instanceof Error ? err.message : "unknown error"
+        }. Try again.`,
+      });
     }
   };
 
