@@ -65,6 +65,18 @@ export const api = {
       body: JSON.stringify({ id }),
     }).then((r) => json<{ ok: boolean }>(r)),
 
+  threads: () =>
+    fetch("/api/threads")
+      .then((r) => json<{ threads: import("./ThreadsPanel").ThreadsData }>(r))
+      .then((d) => d.threads),
+
+  closeLoop: (id: string) =>
+    fetch("/api/loops", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status: "completed" }),
+    }).then((r) => json<{ ok: boolean }>(r)),
+
   resetDemo: () =>
     fetch("/api/demo/reset", { method: "POST" }).then((r) => json<{ reset: boolean }>(r)),
 

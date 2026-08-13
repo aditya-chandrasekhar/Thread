@@ -11,6 +11,7 @@ import MemoryToast from "./MemoryToast";
 import ConnectionReveal from "./ConnectionReveal";
 import BriefingPanel from "./BriefingPanel";
 import DemoPanel from "./DemoPanel";
+import ThreadsPanel, { type ThreadsData } from "./ThreadsPanel";
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
@@ -32,6 +33,8 @@ export default function ThreadApp() {
   const [briefing, setBriefing] = useState<ReturnBriefing | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
+  const [threads, setThreads] = useState<ThreadsData | null>(null);
+  const [threadsOpen, setThreadsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [seconds, setSeconds] = useState(0);
 
@@ -57,6 +60,7 @@ export default function ThreadApp() {
   useEffect(() => {
     api.status().then(setStatus).catch(() => setStatus(null));
     refreshPeople();
+    api.threads().then(setThreads).catch(() => {});
   }, [refreshPeople]);
 
   useEffect(() => {
@@ -148,6 +152,7 @@ export default function ThreadApp() {
       setPhase("idle");
       showToast(result);
       refreshPeople();
+      refreshThreads();
       if (result.newConnections.length > 0) {
         revealQueueRef.current = [...result.newConnections];
         setTimeout(() => popReveal(), 1600);
@@ -159,6 +164,36 @@ export default function ThreadApp() {
           ? { ...s, initialText: transcript, notice: `Couldn't save memory: ${err instanceof Error ? err.message : "unknown error"}. Try again.` }
           : s
       );
+    }
+  };
+
+  const refreshThreads = useCallback(async () => {
+    try {
+      setThreads(await api.threads());
+    } catch {
+      /* panel simply stays stale */
+    }
+  }, []);
+
+  const toggleThreads = async () => {
+    if (!threadsOpen) {
+      setDemoOpen(false); // shares the left edge with the demo panel
+      await refreshThreads();
+    }
+    setThreadsOpen((v) => !v);
+  };
+
+  const closeLoop = async (id: string) => {
+    await api.closeLoop(id).catch(() => {});
+    refreshThreads();
+    if (briefing) selectPersonBriefing(briefing.person.id);
+  };
+
+  const selectPersonBriefing = async (personId: string) => {
+    try {
+      setBriefing(await api.briefing(personId));
+    } catch {
+      /* keep old briefing */
     }
   };
 
@@ -245,6 +280,8 @@ export default function ThreadApp() {
     setToast(null);
     setReveal(null);
     setSheet(null);
+    setThreads(null);
+    setThreadsOpen(false);
     revealQueueRef.current = [];
     try {
       await api.resetDemo();
@@ -273,9 +310,33 @@ export default function ThreadApp() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={toggleThreads}
+            className={`glass-subtle flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs transition ${
+              threadsOpen ? "text-white" : "text-white/55 hover:text-white/85"
+            }`}
+          >
+            <svg width="12" height="12" viewBox="0 0 20 20" fill="none" aria-hidden>
+              <path
+                d="M3 14c3.5 1 6-1.5 7-4s3.5-5 7-4"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+            Threads
+            {threads && threads.openLoops.length > 0 && !threadsOpen && (
+              <span className="ml-0.5 rounded-full bg-amber-300/90 px-1.5 text-[10px] font-semibold text-black">
+                {threads.openLoops.length}
+              </span>
+            )}
+          </button>
           {DEMO_MODE && (
             <button
-              onClick={() => setDemoOpen((v) => !v)}
+              onClick={() => {
+                setThreadsOpen(false);
+                setDemoOpen((v) => !v);
+              }}
               className={`glass-subtle rounded-full px-3.5 py-1.5 text-xs transition ${
                 demoOpen ? "text-white" : "text-white/55 hover:text-white/85"
               }`}
@@ -383,6 +444,16 @@ export default function ThreadApp() {
             onCreate={createPerson}
             onForget={forgetPerson}
             onClose={() => setPickerOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {threadsOpen && threads && (
+          <ThreadsPanel
+            threads={threads}
+            onCloseLoop={closeLoop}
+            onClose={() => setThreadsOpen(false)}
           />
         )}
       </AnimatePresence>
