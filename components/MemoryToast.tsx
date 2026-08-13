@@ -24,6 +24,16 @@ export default function MemoryToast(props: { result: ProcessResult; onDone: () =
             {result.openLoopsCreated > 0 &&
               ` · ${result.openLoopsCreated} open ${result.openLoopsCreated === 1 ? "loop" : "loops"}`}
           </p>
+          {result.identified === "created" && (
+            <p className="mt-0.5 text-[10px] uppercase tracking-wide text-thread/70">
+              new person · identified from conversation
+            </p>
+          )}
+          {result.identified === "existing" && (
+            <p className="mt-0.5 text-[10px] uppercase tracking-wide text-serendipity/80">
+              recognized from conversation
+            </p>
+          )}
         </div>
         <button
           onClick={onDone}

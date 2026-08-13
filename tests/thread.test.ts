@@ -11,6 +11,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ObjectId } from "mongodb";
 import { fallbackExtract } from "../lib/memoryExtraction";
+import { identifyPersonName } from "../lib/identify";
 import { keywordMatch } from "../lib/connectionMatcher";
 import { composeBriefing } from "../lib/briefing";
 import { DEMO_TRANSCRIPTS } from "../lib/demoScript";
@@ -33,6 +34,13 @@ function mem(personId: ObjectId, type: MemoryDoc["type"], text: string, createdA
     createdAt,
   };
 }
+
+test("person is identified from the conversation (heuristic fallback)", async () => {
+  // No OPENROUTER_API_KEY in the test env → deterministic path runs.
+  assert.equal(await identifyPersonName(DEMO_TRANSCRIPTS.maya.transcript), "Maya");
+  assert.equal(await identifyPersonName(DEMO_TRANSCRIPTS.daniel.transcript), "Daniel");
+  assert.equal(await identifyPersonName("Nice weather at this conference."), null);
+});
 
 test("Maya's need and Aditya's promise are extracted", () => {
   const result = fallbackExtract(DEMO_TRANSCRIPTS.maya.transcript, "Maya");

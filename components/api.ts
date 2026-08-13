@@ -44,11 +44,11 @@ export const api = {
     return d.text;
   },
 
-  processEncounter: (personId: string, transcript: string, startedAt?: string) =>
+  processEncounter: (personId: string | null, transcript: string, startedAt?: string) =>
     fetch("/api/encounters/process", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ personId, transcript, startedAt }),
+      body: JSON.stringify({ personId: personId ?? undefined, transcript, startedAt }),
     })
       .then((r) => json<{ result: ProcessResult }>(r))
       .then((d) => d.result),

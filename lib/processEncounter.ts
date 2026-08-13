@@ -4,6 +4,7 @@ import { extractMemories } from "./memoryExtraction";
 import { embedTexts, embeddingsAvailable } from "./embeddings";
 import { findRelevantConnections, phraseConnectionReason } from "./connectionMatcher";
 import { existingContextFor } from "./people";
+import { identifyPersonName } from "./identify";
 import type {
   ConnectionDoc,
   EncounterDoc,
@@ -21,16 +22,12 @@ import type {
  */
 export async function processEncounter(
   db: Db,
-  opts: { personId: string; transcript: string; startedAt?: string }
+  opts: { personId?: string | null; transcript: string; startedAt?: string }
 ): Promise<ProcessResult> {
-  const { personId, transcript } = opts;
-  if (!ObjectId.isValid(personId)) throw new Error("Invalid personId");
-  const _personId = new ObjectId(personId);
+  const { transcript } = opts;
 
-  const person = await db
-    .collection<PersonDoc>(COLLECTIONS.people)
-    .findOne({ _id: _personId, sessionId: SESSION_ID });
-  if (!person) throw new Error("Person not found");
+  const { person, identified } = await resolvePerson(db, opts.personId, transcript);
+  const _personId = person._id!;
 
   const existingContext = await existingContextFor(db, SESSION_ID, _personId);
   const { result: extraction, engine } = await extractMemories({
@@ -115,7 +112,7 @@ export async function processEncounter(
   const newConnections = await persistConnections(db, memoryDocs, person);
 
   return {
-    personId,
+    personId: _personId.toHexString(),
     personName: person.name,
     memoriesSaved: memoryDocs.length,
     openLoopsCreated: loopDocs.length,
@@ -123,7 +120,51 @@ export async function processEncounter(
     memories: memoryDocs.map((m) => ({ type: m.type, text: m.text })),
     newConnections,
     extractionEngine: engine,
+    identified,
   };
+}
+
+/**
+ * Resolve who this encounter is with. An explicit personId wins; otherwise
+ * the name is lifted from the conversation itself, matched case-insensitively
+ * against people already in memory, or a new person is created.
+ */
+async function resolvePerson(
+  db: Db,
+  personId: string | null | undefined,
+  transcript: string
+): Promise<{ person: PersonDoc; identified: ProcessResult["identified"] }> {
+  const people = db.collection<PersonDoc>(COLLECTIONS.people);
+
+  if (personId) {
+    if (!ObjectId.isValid(personId)) throw new Error("Invalid personId");
+    const person = await people.findOne({ _id: new ObjectId(personId), sessionId: SESSION_ID });
+    if (!person) throw new Error("Person not found");
+    return { person, identified: "provided" };
+  }
+
+  const name = (await identifyPersonName(transcript)) ?? "Someone new";
+
+  const existing = await people.findOne({
+    sessionId: SESSION_ID,
+    name: { $regex: `^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
+  });
+  if (existing) return { person: existing, identified: "existing" };
+
+  const now = new Date();
+  const doc: PersonDoc = {
+    sessionId: SESSION_ID,
+    name,
+    shortDescription: "",
+    interests: [],
+    createdAt: now,
+    updatedAt: now,
+    firstMetAt: now,
+    lastEncounterAt: null,
+  };
+  const res = await people.insertOne(doc);
+  doc._id = res.insertedId;
+  return { person: doc, identified: "created" };
 }
 
 async function persistConnections(

@@ -112,6 +112,9 @@ export interface ProcessResult {
   memories: { type: MemoryType; text: string }[];
   newConnections: NewConnectionInfo[];
   extractionEngine: "llm" | "fallback";
+  /** How the person was resolved: explicitly selected, recognized from the
+   * conversation, or newly created from the conversation. */
+  identified: "provided" | "existing" | "created";
 }
 
 export interface BriefingConnection {

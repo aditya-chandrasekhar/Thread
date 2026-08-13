@@ -8,12 +8,12 @@ export async function POST(request: Request) {
       transcript?: string;
       startedAt?: string;
     };
-    if (!body.personId || !body.transcript?.trim()) {
-      return Response.json({ error: "personId and transcript are required" }, { status: 400 });
+    if (!body.transcript?.trim()) {
+      return Response.json({ error: "transcript is required" }, { status: 400 });
     }
     const db = await getDb();
     const result = await processEncounter(db, {
-      personId: body.personId,
+      personId: body.personId ?? null,
       transcript: body.transcript.trim(),
       startedAt: body.startedAt,
     });

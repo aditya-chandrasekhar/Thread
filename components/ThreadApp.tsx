@@ -74,10 +74,7 @@ export default function ThreadApp() {
   // ---------- encounter flow ----------
 
   const startEncounter = async () => {
-    if (!selected) {
-      setPickerOpen(true);
-      return;
-    }
+    // No person selected? Thread identifies them from the conversation.
     setError(null);
     setBriefing(null);
     startedAtRef.current = new Date().toISOString();
@@ -148,19 +145,21 @@ export default function ThreadApp() {
   };
 
   const submitTranscript = async (transcript: string) => {
-    if (!selected) return;
     setPhase("processing");
     setError(null);
     try {
       const result = await api.processEncounter(
-        selected.id,
+        selected?.id ?? null,
         transcript,
         startedAtRef.current ?? undefined
       );
       setSheet(null);
       setPhase("idle");
       showToast(result);
-      refreshPeople();
+      const list = await refreshPeople();
+      // Adopt whoever the conversation turned out to be with.
+      const who = list.find((p) => p.id === result.personId);
+      if (who) setSelected(who);
       refreshThreads();
       if (result.newConnections.length > 0) {
         revealQueueRef.current = [...result.newConnections];
@@ -424,9 +423,9 @@ export default function ThreadApp() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {sheet && selected && (
+        {sheet && (
           <TranscriptSheet
-            personName={selected.name}
+            personName={selected?.name ?? "someone new"}
             initialText={sheet.initialText}
             notice={sheet.notice}
             demoMode={DEMO_MODE}
@@ -455,6 +454,11 @@ export default function ThreadApp() {
             onSelect={selectPerson}
             onCreate={createPerson}
             onForget={forgetPerson}
+            onClear={() => {
+              setSelected(null);
+              setBriefing(null);
+              setPickerOpen(false);
+            }}
             onClose={() => setPickerOpen(false)}
           />
         )}
@@ -502,10 +506,10 @@ export default function ThreadApp() {
             </span>
             <span className="text-left">
               <span className="block text-[9px] uppercase tracking-[0.16em] text-white/35">
-                Prototype identity
+                {selected ? "Prototype identity" : "Identity"}
               </span>
               <span className="block text-sm font-medium text-white/90">
-                {selected ? selected.name : "Choose person"}
+                {selected ? selected.name : "Auto-detect from voice"}
               </span>
             </span>
           </button>
