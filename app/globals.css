@@ -1,26 +1,120 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0b0b0d;
+  --foreground: #ececee;
+  --thread-green: #00ed64;
+  --thread-violet: #a78bfa;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-thread: var(--thread-green);
+  --color-serendipity: var(--thread-violet);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  height: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  overflow: hidden;
+}
+
+/* Soft warm ambient glow behind everything */
+.ambient-backdrop {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(120, 90, 60, 0.18), transparent 60%),
+    radial-gradient(ellipse 60% 45% at 85% 110%, rgba(167, 139, 250, 0.08), transparent 65%),
+    radial-gradient(ellipse 60% 45% at 12% 105%, rgba(0, 237, 100, 0.05), transparent 60%),
+    #0b0b0d;
+}
+
+.glass {
+  background: rgba(20, 20, 24, 0.62);
+  backdrop-filter: blur(22px) saturate(1.3);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.05) inset,
+    0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.glass-subtle {
+  background: rgba(20, 20, 24, 0.45);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.hairline {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Webcam dim + vignette so overlaid UI stays legible */
+.camera-vignette {
+  background:
+    linear-gradient(to bottom, rgba(11, 11, 13, 0.55) 0%, rgba(11, 11, 13, 0.05) 22%, rgba(11, 11, 13, 0.05) 62%, rgba(11, 11, 13, 0.72) 100%),
+    radial-gradient(ellipse 120% 100% at 50% 50%, transparent 55%, rgba(11, 11, 13, 0.5) 100%);
+}
+
+.text-glow-green {
+  text-shadow: 0 0 24px rgba(0, 237, 100, 0.35);
+}
+
+::selection {
+  background: rgba(0, 237, 100, 0.25);
+}
+
+/* Slim scrollbars inside panels */
+.thin-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+}
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.85); }
+}
+.pulse-dot {
+  animation: pulse-dot 2.2s ease-in-out infinite;
+}
+
+@keyframes rec-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45); }
+  60% { box-shadow: 0 0 0 9px rgba(239, 68, 68, 0); }
+}
+.rec-pulse {
+  animation: rec-pulse 1.6s ease-out infinite;
+}
+
+@keyframes thread-shimmer {
+  0% { background-position: 200% 50%; }
+  100% { background-position: -200% 50%; }
+}
+.thread-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(236, 236, 238, 0.55) 40%,
+    rgba(255, 255, 255, 1) 50%,
+    rgba(236, 236, 238, 0.55) 60%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: thread-shimmer 2.4s linear infinite;
 }
