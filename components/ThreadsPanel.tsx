@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { api } from "./api";
 
 export interface ThreadsData {
   peopleCount: number;
@@ -15,10 +17,12 @@ export interface ThreadsData {
  */
 export default function ThreadsPanel(props: {
   threads: ThreadsData;
+  askAvailable: boolean;
+  ttsAvailable: boolean;
   onCloseLoop: (id: string) => void;
   onClose: () => void;
 }) {
-  const { threads, onCloseLoop, onClose } = props;
+  const { threads, askAvailable, ttsAvailable, onCloseLoop, onClose } = props;
   const userLoops = threads.openLoops.filter((l) => l.owner === "user");
   const theirLoops = threads.openLoops.filter((l) => l.owner === "person");
   const empty =
@@ -30,8 +34,9 @@ export default function ThreadsPanel(props: {
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: -400, opacity: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 32 }}
-      className="glass thin-scroll absolute left-5 top-20 bottom-24 z-30 w-[21rem] overflow-y-auto rounded-3xl p-6"
+      className="glass absolute left-5 top-20 bottom-24 z-30 flex w-[21rem] flex-col overflow-hidden rounded-3xl"
     >
+      <div className="thin-scroll flex-1 overflow-y-auto p-6">
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-white">Threads</h2>
@@ -128,6 +133,126 @@ export default function ThreadsPanel(props: {
           </p>
         </section>
       )}
+      </div>
+
+      {askAvailable && <AskThread ttsAvailable={ttsAvailable} />}
     </motion.aside>
+  );
+}
+
+/** Memory-grounded chat: ask questions, answered only from what Thread stored. */
+function AskThread({ ttsAvailable }: { ttsAvailable: boolean }) {
+  const [messages, setMessages] = useState<{ role: "you" | "thread"; text: string }[]>([]);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [speaking, setSpeaking] = useState(false);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, busy]);
+
+  const send = async () => {
+    const q = input.trim();
+    if (!q || busy) return;
+    setInput("");
+    setMessages((m) => [...m, { role: "you", text: q }]);
+    setBusy(true);
+    try {
+      const answer = await api.ask(q);
+      setMessages((m) => [...m, { role: "thread", text: answer }]);
+    } catch (err) {
+      setMessages((m) => [
+        ...m,
+        { role: "thread", text: err instanceof Error ? err.message : "Something went wrong — try again." },
+      ]);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const speakLast = async () => {
+    const last = [...messages].reverse().find((m) => m.role === "thread");
+    if (!last) return;
+    if (speaking) {
+      audioRef.current?.pause();
+      setSpeaking(false);
+      return;
+    }
+    try {
+      setSpeaking(true);
+      const blob = await api.speak(last.text);
+      const audio = new Audio(URL.createObjectURL(blob));
+      audioRef.current = audio;
+      audio.onended = () => setSpeaking(false);
+      audio.onerror = () => setSpeaking(false);
+      await audio.play();
+    } catch {
+      setSpeaking(false);
+    }
+  };
+
+  return (
+    <div className="border-t border-white/8 bg-black/20 p-4">
+      {messages.length > 0 && (
+        <div ref={scrollRef} className="thin-scroll mb-3 max-h-44 space-y-2 overflow-y-auto pr-1">
+          {messages.map((m, i) => (
+            <div
+              key={i}
+              className={`max-w-[92%] rounded-2xl px-3 py-2 text-[13px] leading-snug ${
+                m.role === "you"
+                  ? "ml-auto bg-white/10 text-white/85"
+                  : "bg-thread/10 text-white/80"
+              }`}
+            >
+              {m.text}
+            </div>
+          ))}
+          {busy && (
+            <div className="max-w-[92%] rounded-2xl bg-thread/10 px-3 py-2 text-[13px] text-white/45">
+              remembering…
+            </div>
+          )}
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && send()}
+          placeholder={messages.length === 0 ? "Ask your memory — “what do I owe Maya?”" : "Ask a follow-up…"}
+          className="min-w-0 flex-1 rounded-full border border-white/10 bg-black/25 px-4 py-2 text-[13px] text-white/85 outline-none placeholder:text-white/30 focus:border-white/25"
+        />
+        {ttsAvailable && messages.some((m) => m.role === "thread") && (
+          <button
+            onClick={speakLast}
+            title="Speak the answer"
+            className={`shrink-0 rounded-full border p-2 transition ${
+              speaking
+                ? "border-thread/60 text-thread"
+                : "border-white/12 text-white/50 hover:border-white/30 hover:text-white/85"
+            }`}
+          >
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M8 3 4.5 5.5H2v5h2.5L8 13V3Z"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinejoin="round"
+              />
+              <path d="M10.5 6a3 3 0 0 1 0 4M12.5 4.5a5.5 5.5 0 0 1 0 7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
+        <button
+          onClick={send}
+          disabled={!input.trim() || busy}
+          className="shrink-0 rounded-full bg-thread/90 px-3.5 py-2 text-[13px] font-medium text-black transition hover:bg-thread disabled:opacity-30"
+        >
+          Ask
+        </button>
+      </div>
+    </div>
   );
 }

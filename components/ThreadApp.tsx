@@ -452,6 +452,8 @@ export default function ThreadApp() {
         {threadsOpen && threads && (
           <ThreadsPanel
             threads={threads}
+            askAvailable={status?.openrouter ?? false}
+            ttsAvailable={status?.elevenlabs ?? false}
             onCloseLoop={closeLoop}
             onClose={() => setThreadsOpen(false)}
           />

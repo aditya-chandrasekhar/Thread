@@ -70,6 +70,15 @@ export const api = {
       .then((r) => json<{ threads: import("./ThreadsPanel").ThreadsData }>(r))
       .then((d) => d.threads),
 
+  ask: (question: string) =>
+    fetch("/api/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    })
+      .then((r) => json<{ answer: string }>(r))
+      .then((d) => d.answer),
+
   closeLoop: (id: string) =>
     fetch("/api/loops", {
       method: "PATCH",
