@@ -18,7 +18,14 @@ function getClient(): Promise<MongoClient> {
   }
   if (!global._threadMongo) {
     const client = new MongoClient(uri, { serverSelectionTimeoutMS: 6000 });
-    global._threadMongo = client.connect();
+    global._threadMongo = client.connect().catch((err) => {
+      // Don't poison the cache with a rejected promise — drop it so the
+      // next request retries the connection instead of failing instantly
+      // until the server restarts.
+      global._threadMongo = undefined;
+      client.close().catch(() => {});
+      throw err;
+    });
   }
   return global._threadMongo;
 }
